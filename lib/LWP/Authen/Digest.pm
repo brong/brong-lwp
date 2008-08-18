@@ -12,6 +12,8 @@ sub authenticate
                                                   $request->url, $proxy);
     return $response unless defined $user and defined $pass;
 
+    my $uri = $request->url->as_string();
+
     # Need to check this isn't a repeated fail!
     my $r = $response;
     while ($r) {
@@ -20,27 +22,34 @@ sub authenticate
 	    # here we know this failed before
 	    $response->header("Client-Warning" =>
 			      "Credentials for '$user' failed before");
+            delete $ua->{authenticated_paths}{$uri};
 	    return $response;
 	}
 	$r = $r->previous;
     }
 
-    my $referral = $class->add_authen_headers($ua, $proxy, $auth_param, $request);
+    # store the authenticated path for adding headers
+    my $auth_detail = $ua->{authenticated_paths}{$uri} = [$class, $proxy, $auth_param, $user, $pass, 0];
 
-    return $response unless $referral;
+    my $referral = $request->clone();
+    $class->add_authen_header($ua, $referral, $auth_detail);
+
+    # we shouldn't really do this, but...
+    $referral->{digest_user_pass} = [$user, $pass];
 
     return $ua->request($referral, $arg, $size, $response);
 }
 
-sub add_authen_headers
+sub add_authen_header
 {
-    my($class, $ua, $proxy, $auth_param, $request) = @_;
+    my($class, $request, $auth_detail) = @_;
 
-    my($user, $pass) = $ua->get_basic_credentials($auth_param->{realm},
-                                                  $request->url, $proxy);
-    return undef unless defined $user and defined $pass;
+    my (undef, $proxy, $auth_param, $user, $pass, $noncecount) = @$auth_detail;
 
-    my $nc = sprintf "%08X", ++$ua->{authen_md5_nonce_count}{$auth_param->{nonce}};
+    # increase nonce_count
+    $auth_detail->[5]++;
+
+    my $nc = sprintf "%08X", $noncecount;
     my $cnonce = sprintf "%8x", time;
 
     my $uri = $request->url->path_query;
@@ -94,12 +103,9 @@ sub add_authen_headers
     my $auth_header = $proxy ? "Proxy-Authorization" : "Authorization";
     my $auth_value  = "Digest " . join(", ", @pairs);
 
-    my $referral = $request->clone;
-    $referral->header($auth_header => $auth_value);
-    # we shouldn't really do this, but...
-    $referral->{digest_user_pass} = [$user, $pass];
+    $request->header($auth_header => $auth_value);
 
-    return $referral;
+    return $request;
 }
 
 1;

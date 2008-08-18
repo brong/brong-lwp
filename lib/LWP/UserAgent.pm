@@ -286,15 +286,15 @@ sub request
 
     LWP::Debug::trace('()');
 
-    if ($self->{'authen_cache'}) {
+    if ($self->{'authenticated_paths'}) {
         my $request_uri = $request->url->as_string();
-        foreach my $uri (keys %{$self->{'authen_cache'}}) {
+        foreach my $uri (keys %{$self->{'authenticated_paths'}}) {
             # check if it's a sub-path of a cached authentication handler
             next unless substr($request_uri, 0, length($uri)) eq $uri;
-            my $item = $self->{'authen_cache'}{$uri};
-            my $class = $item->[0];
+            my $auth_detail = $self->{'authenticated_paths'}{$uri};
+            my $class = $auth_detail->[0];
             warn "adding opportunistic cache header";
-            $class->add_authen_header($self, $request, $item);
+            $class->add_authen_header($self, $request, $auth_detail);
             last;
         }
     }
