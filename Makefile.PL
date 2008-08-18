@@ -70,3 +70,5 @@ sub flag_file {
         unlink($file);
     }
 }
+
+1;
