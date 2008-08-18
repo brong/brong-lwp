@@ -294,7 +294,7 @@ sub request
             my $auth_detail = $self->{'authenticated_paths'}{$uri};
             my $class = $auth_detail->[0];
             warn "adding opportunistic cache header";
-            $class->add_authen_header($self, $request, $auth_detail);
+            $class->add_authen_header($request, $auth_detail);
             last;
         }
     }

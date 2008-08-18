@@ -32,7 +32,7 @@ sub authenticate
     my $auth_detail = $ua->{authenticated_paths}{$uri} = [$class, $proxy, $auth_param, $user, $pass, 0];
 
     my $referral = $request->clone();
-    $class->add_authen_header($ua, $referral, $auth_detail);
+    $class->add_authen_header($referral, $auth_detail);
 
     # we shouldn't really do this, but...
     $referral->{digest_user_pass} = [$user, $pass];
