@@ -286,6 +286,19 @@ sub request
 
     LWP::Debug::trace('()');
 
+    if ($self->{'authen_cache'}) {
+        my $request_uri = $request->url->as_string();
+        foreach my $uri (keys %{$self->{'authen_cache'}}) {
+            # check if it's a sub-path of a cached authentication handler
+            next unless substr($request_uri, 0, length($uri)) eq $uri;
+            my $item = $self->{'authen_cache'}{$uri};
+            my $class = $item->[0];
+            warn "adding opportunistic cache header";
+            $class->add_authen_header($self, $request, $item);
+            last;
+        }
+    }
+
     my $response = $self->simple_request($request, $arg, $size);
 
     my $code = $response->code;
@@ -407,6 +420,7 @@ sub request
 				  "Unsupported authentication scheme '$scheme'");
 		next CHALLENGE;
 	    }
+
 	    return $class->authenticate($self, $proxy, $challenge, $response,
 					$request, $arg, $size);
 	}
