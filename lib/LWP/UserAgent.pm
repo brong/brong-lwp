@@ -279,7 +279,7 @@ sub prepare_request
     #   userid and password in the Proxy-Authorization header field without
     #   receiving another challenge from the proxy server. See section 4 for
     #   security considerations associated with Basic authentication.
-    my $host = eval { $request->url->host_port() };
+    my $host = eval { lc($request->url->host_port()) };
     if ($host and $self->{'cached_authentication'} and
         $self->{'cached_authentication'}{$host}) {
 
@@ -631,6 +631,7 @@ sub credentials
     my($self, $netloc, $realm, $uid, $pass) = @_;
     @{ $self->{'basic_authentication'}{lc($netloc)}{$realm} } =
 	($uid, $pass);
+    delete $self->{cached_authentication}{lc($netloc)};
 }
 
 

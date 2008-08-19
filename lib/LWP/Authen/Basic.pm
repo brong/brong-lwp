@@ -12,7 +12,7 @@ sub authenticate
 						  $request->url, $proxy);
     return $response unless defined $user and defined $pass;
 
-    my $host = $request->uri->host_port();
+    my $host = lc($request->uri->host_port());
     my $authpath = $request->uri->path();
 
     my $auth_header = $proxy ? "Proxy-Authorization" : "Authorization";
