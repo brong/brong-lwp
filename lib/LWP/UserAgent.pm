@@ -279,8 +279,8 @@ sub prepare_request
     #   userid and password in the Proxy-Authorization header field without
     #   receiving another challenge from the proxy server. See section 4 for
     #   security considerations associated with Basic authentication.
-    my $host = $request->url->host_port;
-    if ($self->{'cached_authentication'} and
+    my $host = eval { $request->url->host_port() };
+    if ($host and $self->{'cached_authentication'} and
         $self->{'cached_authentication'}{$host}) {
 
         my $path = $request->url->path;
