@@ -21,7 +21,7 @@ sub authenticate
     my $r = $response;
     while ($r) {
       my $auth = $r->request->header($auth_header);
-	if ($auth);
+	if ($auth) {
 	    # here we know this failed before
 	    $response->header("Client-Warning" =>
 			      "Credentials for '$user' failed before");
