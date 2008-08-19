@@ -297,7 +297,7 @@ sub prepare_request
             my $auth_detail = $cached->{$authpath};
             my $class = $auth_detail->[0];
             next unless $class->can('add_authen_header');
-            $class->add_authen_header($self, $request, $host, $authpath);
+            $class->add_authen_header($request, $auth_detail);
 
             # one is enough!
             last;

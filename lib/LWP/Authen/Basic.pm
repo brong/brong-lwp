@@ -9,7 +9,7 @@ sub authenticate
        $request, $arg, $size) = @_;
 
     my($user, $pass) = $ua->get_basic_credentials($auth_param->{realm},
-                                                  $request->url, $proxy);
+						  $request->url, $proxy);
     return $response unless defined $user and defined $pass;
 
     my $host = $request->uri->host_port();
@@ -25,28 +25,28 @@ sub authenticate
 	    # here we know this failed before
 	    $response->header("Client-Warning" =>
 			      "Credentials for '$user' failed before");
-            delete $ua->{cached_authentication}{$host}{$authpath};
+	    delete $ua->{cached_authentication}{$host}{$authpath};
 	    return $response;
 	}
 	$r = $r->previous;
     }
 
     # store the authenticated path for adding headers
-    $ua->{cached_authentication}{$host}{$authpath} = [$class, $proxy, $auth_param, $user, $pass];
+    my $auth_detail
+	= $ua->{cached_authentication}{$host}{$authpath} 
+	= [$class, $proxy, $auth_param, $user, $pass];
 
     my $referral = $request->clone;
 
-    $class->add_authen_header($ua, $referral, $host, $authpath);
+    $class->add_authen_header($referral, $auth_detail);
 
     return $ua->request($referral, $arg, $size, $response);
 }
 
 sub add_authen_header {
-    my ($class, $ua, $request, $host, $authpath) = @_;
+    my($class, $request, $auth_detail) = @_;
 
-    my $auth_detail = $ua->{cached_authentication}{$host}{$authpath};
-
-    my (undef, $proxy, $auth_param, $user, $pass) = @$auth_detail;
+    my(undef, $proxy, $auth_param, $user, $pass) = @$auth_detail;
 
     my $auth_header = $proxy ? "Proxy-Authorization" : "Authorization";
     my $auth_value = "Basic " . MIME::Base64::encode("$user:$pass", "");
