@@ -267,6 +267,43 @@ sub prepare_request
 	}
     }
 
+    # check if there are cached authentications for this host.
+    # rfc2617 says:
+    #   A client SHOULD assume that all paths at or deeper than the depth of
+    #   the last symbolic element in the path field of the Request-URI also
+    #   are within the protection space specified by the Basic realm value of
+    #   the current challenge. A client MAY preemptively send the
+    #   corresponding Authorization header with requests for resources in
+    #   that space without receipt of another challenge from the server.
+    #   Similarly, when a client sends a request to a proxy, it may reuse a
+    #   userid and password in the Proxy-Authorization header field without
+    #   receiving another challenge from the proxy server. See section 4 for
+    #   security considerations associated with Basic authentication.
+    my $host = $request->url->host_port;
+    if ($self->{'cached_authentication'} and
+        $self->{'cached_authentication'}{$host}) {
+
+        my $path = $request->url->path;
+        my $cached = $self->{'cached_authentication'}{$host};
+
+        # reverse sort => longest match first :)
+        foreach my $authpath (reverse sort keys %$cached) {
+
+            # check if it's a sub-path of cached authentication details
+            next if length($authpath) > length($path); 
+            next unless substr($path, 0, length($authpath)) eq $authpath;
+
+            # add the authentication header
+            my $auth_detail = $cached->{$authpath};
+            my $class = $auth_detail->[0];
+            next unless $class->can('add_authen_header');
+            $class->add_authen_header($self, $request, $host, $authpath);
+
+            # one is enough!
+            last;
+        }
+    }
+
     return($request);
 }
 
@@ -285,19 +322,6 @@ sub request
     my($self, $request, $arg, $size, $previous) = @_;
 
     LWP::Debug::trace('()');
-
-    if ($self->{'authenticated_paths'}) {
-        my $request_uri = $request->url->as_string();
-        foreach my $uri (keys %{$self->{'authenticated_paths'}}) {
-            # check if it's a sub-path of a cached authentication handler
-            next unless substr($request_uri, 0, length($uri)) eq $uri;
-            my $auth_detail = $self->{'authenticated_paths'}{$uri};
-            my $class = $auth_detail->[0];
-            warn "adding opportunistic cache header";
-            $class->add_authen_header($request, $auth_detail);
-            last;
-        }
-    }
 
     my $response = $self->simple_request($request, $arg, $size);
 

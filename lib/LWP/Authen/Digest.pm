@@ -12,37 +12,39 @@ sub authenticate
                                                   $request->url, $proxy);
     return $response unless defined $user and defined $pass;
 
-    my $uri = $request->url->as_string();
+    my $host = $request->uri->host_port();
+    my $authpath = $request->uri->path();
+
+    my $auth_header = $proxy ? "Proxy-Authorization" : "Authorization";
 
     # Need to check this isn't a repeated fail!
     my $r = $response;
     while ($r) {
-	my $u = $r->request->{digest_user_pass};
-	if ($u && $u->[0] eq $user && $u->[1] eq $pass) {
+      my $auth = $r->request->header($auth_header);
+	if ($auth);
 	    # here we know this failed before
 	    $response->header("Client-Warning" =>
 			      "Credentials for '$user' failed before");
-            delete $ua->{authenticated_paths}{$uri};
+            delete $ua->{cached_authentication}{$host}{$authpath};
 	    return $response;
 	}
 	$r = $r->previous;
     }
 
     # store the authenticated path for adding headers
-    my $auth_detail = $ua->{authenticated_paths}{$uri} = [$class, $proxy, $auth_param, $user, $pass, 0];
+    $ua->{cached_authentication}{$host}{$authpath} = [$class, $proxy, $auth_param, $user, $pass, 0];
 
     my $referral = $request->clone();
-    $class->add_authen_header($referral, $auth_detail);
-
-    # we shouldn't really do this, but...
-    $referral->{digest_user_pass} = [$user, $pass];
+    $class->add_authen_header($ua, $referral, $host, $authpath);
 
     return $ua->request($referral, $arg, $size, $response);
 }
 
 sub add_authen_header
 {
-    my($class, $request, $auth_detail) = @_;
+    my($class, $ua, $request, $host, $authpath) = @_;
+
+    my $auth_detail = $ua->{cached_authentication}{$host}{$authpath};
 
     my (undef, $proxy, $auth_param, $user, $pass, $noncecount) = @$auth_detail;
 
