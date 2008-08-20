@@ -258,18 +258,21 @@ print "not " unless $res->is_success;
 print $res->content;
 
 # Let's try with a $ua that does not pass out credentials
+$req = new HTTP::Request GET => url("/basic", $base);
 $res = $ua->request($req);
 print "not " unless $res->code == 401;
 print "ok 13\n";
 
 # Let's try to set credentials for this realm
 $ua->credentials($req->url->host_port, "libwww-perl", "ok 12", "xyzzy");
+$req = new HTTP::Request GET => url("/basic", $base);
 $res = $ua->request($req);
 print "not " unless $res->is_success;
 print "ok 14\n";
 
 # Then illegal credentials
 $ua->credentials($req->url->host_port, "libwww-perl", "user", "passwd");
+$req = new HTTP::Request GET => url("/basic", $base);
 $res = $ua->request($req);
 print "not " unless $res->code == 401;
 print "ok 15\n";

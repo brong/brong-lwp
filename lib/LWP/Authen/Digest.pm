@@ -1,18 +1,63 @@
 package LWP::Authen::Digest;
 use strict;
+use base 'LWP::Authen::Basic';
 
 require Digest::MD5;
+require URI;
 
-sub authenticate
+# use the same logic as Basic to decide when to calculate the header
+
+sub handles_request 
 {
-    my($class, $ua, $proxy, $auth_param, $response,
-       $request, $arg, $size) = @_;
+    my($class, $request, $auth_param, $base_url) = @_;
 
-    my($user, $pass) = $ua->get_basic_credentials($auth_param->{realm},
-                                                  $request->url, $proxy);
-    return $response unless defined $user and defined $pass;
+    my $host = $request->url->host_port;
+    my $path = $request->url->path;
 
-    my $nc = sprintf "%08X", ++$ua->{authen_md5_nonce_count}{$auth_param->{nonce}};
+    # rfc2617 - domain
+    # A quoted, space-separated list of URIs, as specified in RFC XURI
+    # [7], that define the protection space.  If a URI is an abs_path, it
+    # is relative to the canonical root URL (see section 1.2 above) of
+    # the server being accessed. An absoluteURI in this list may refer to
+    # a different server than the one being accessed. The client can use
+    # this list to determine the set of URIs for which the same
+    # authentication information may be sent: any URI that has a URI in
+    # this list as a prefix (after both have been made absolute) may be
+    # assumed to be in the same protection space. If this directive is
+    # omitted or its value is empty, the client should assume that the
+    # protection space consists of all URIs on the responding server.
+
+    if ($auth_param->{domain}) {
+        foreach my $url (split ' ', $auth_param->{domain}) {
+            my $relative = URI->new_abs($url, $base_url);
+            my $domhost = $relative->host_port();
+            my $dompath = $relative->path();
+            return 1 if ($host eq $domhost and is_subpath($dompath, $path));
+        }
+    }
+    else {
+	my $basehost = $base_url->host_port;
+	# we can assume the entire host
+	return 1 if $host eq $basehost;
+    }
+
+    return 0;
+}
+
+ 
+sub authen_header
+{
+    my($class, $request, $auth_param, $user, $pass) = @_;
+
+    # increase nonce_count
+    if (exists $auth_param->{nonce_count}) {
+        $auth_param->{nonce_count}++;
+    }
+    else {
+        $auth_param->{nonce_count} = 0;
+    }
+
+    my $nc = sprintf "%08X", $auth_param->{nonce_count};
     my $cnonce = sprintf "%8x", time;
 
     my $uri = $request->url->path_query;
@@ -63,28 +108,12 @@ sub authenticate
 	push(@pairs, "$_=" . qq("$resp{$_}"));
     }
 
-    my $auth_header = $proxy ? "Proxy-Authorization" : "Authorization";
     my $auth_value  = "Digest " . join(", ", @pairs);
 
-    # Need to check this isn't a repeated fail!
-    my $r = $response;
-    while ($r) {
-	my $u = $r->request->{digest_user_pass};
-	if ($u && $u->[0] eq $user && $u->[1] eq $pass) {
-	    # here we know this failed before
-	    $response->header("Client-Warning" =>
-			      "Credentials for '$user' failed before");
-	    return $response;
-	}
-	$r = $r->previous;
-    }
-
-    my $referral = $request->clone;
-    $referral->header($auth_header => $auth_value);
-    # we shouldn't really do this, but...
-    $referral->{digest_user_pass} = [$user, $pass];
-
-    return $ua->request($referral, $arg, $size, $response);
+    return $auth_value;
 }
 
 1;
+
+
+ 
