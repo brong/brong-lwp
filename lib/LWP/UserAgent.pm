@@ -157,6 +157,7 @@ sub send_request
     my $proxy = $self->_need_proxy($url);
     if (defined $proxy) {
 	$scheme = $proxy->scheme;
+	$self->run_handler('using-proxy', $request, $proxy);
     }
     else {
 	$scheme = $url->scheme;
@@ -266,6 +267,9 @@ sub prepare_request
 	    $request->init_header($h => [$def_headers->header($h)]);
 	}
     }
+
+    # any other changes here
+    $self->run_handler('prepare-request', $request);
 
     return($request);
 }
@@ -844,6 +848,48 @@ sub _new_response {
     return $response;
 }
 
+
+# Add support for add_handler and delete_handler per Gisle's email,
+# but make them less path based, more generic
+
+sub add_handler {
+    my($self, $name, $id, $sub) = @_;
+
+    push @{$self->{_handlers}{$name}}, [$id, $sub];
+}
+
+sub delete_handler {
+    my($self, $name, $id) = @_;
+
+    return 0 unless $self->{_handlers}{$name};
+
+    # strip out the handler with this id
+    my @new_handlers;
+    my $removed = 0;
+
+    foreach my $handler (@{$self->{_handlers}{$name}}) {
+        if ($handler->[0] eq $id) {
+	    $removed = 1;
+	}
+	else {
+	    push @new_handlers, $handler;
+	}
+    }
+
+    $self->{_handlers}{$name} = \@new_handlers;
+    
+    return $removed;
+}
+
+sub run_handler {
+    my($self, $name, @args) = @_;
+
+    return unless $self->{_handlers}{$name};
+
+    foreach my $handler (@{$self->{_handlers}{$name}}) {
+	return if $handler->[1]->($self, @args);
+    }
+}
 
 1;
 
