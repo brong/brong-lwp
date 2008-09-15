@@ -3,8 +3,9 @@ use strict;
 
 require MIME::Base64;
 
-sub auth_header {
-    my($req, $ua, $host_port, $realm) = @_;
+sub auth_header 
+{
+    my($req, $ua, $host_port, $realm, $auth_param) = @_;
     my($user, $pass) = $ua->credentials($host_port, $realm);
     return "Basic " . MIME::Base64::encode("$user:$pass", "");
 }
@@ -28,7 +29,7 @@ sub authenticate
     my $h = $ua->get_my_handler("request_prepare", @m, sub {
         $_[0]{callback} = sub {
             my($req, $ua) = @_;
-            my $auth_value = auth_header($req, $ua, $host_port, $realm);
+            my $auth_value = auth_header($req, $ua, $host_port, $realm, $auth_param);
             $req->header($auth_header => $auth_value);
         }
     });
@@ -53,7 +54,8 @@ sub authenticate
     return $ua->request($request->clone, $arg, $size, $response);
 }
 
-sub add_path {
+sub add_path 
+{
     my($h, $path) = @_;
     $path =~ s,[^/]+\z,,;
     push(@{$h->{m_path_prefix}}, $path);
